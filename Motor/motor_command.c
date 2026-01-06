@@ -1,5 +1,8 @@
 #include "motor_command.h"
 
+//step angle division 1.8/16=0.11255 degree
+#define Angle_division 16
+
 MOTOR_SPEED_t car_setspeed;
 struct MOTOR_DATA motor1;
 struct MOTOR_DATA motor2;
@@ -36,7 +39,7 @@ void Motor_Init(void)
     HAL_UARTEx_ReceiveToIdle_DMA(&huart3, rx_dat, RXdat_maxsize); // Start DMA reception
 }
 
-//输入4个电机速度，单位rpm，16位有符号整数
+//输入4个电机速度，单位rpm，16位有符号整数，范围-32768~32767
 void Motor_Send_Speed_together(float LB, float LF, float RF, float RB)
 {
     static uint8_t* LB_speedptr = LB_send;
@@ -69,7 +72,7 @@ void Motor_Send_Speed_together(float LB, float LF, float RF, float RB)
         temp[i][0] = var + 1;   // Motor ID
         temp[i][1] = 0xF6;      // Command for speed setting
 
-        // if (__fbs(tempspeed) > 255)
+        // if (__fbs(tempspeed) > 32767)
         // {
         //     //空逻辑？
         // }
@@ -88,10 +91,99 @@ void Motor_Send_Speed_together(float LB, float LF, float RF, float RB)
             temp[i][4] = (tempspeed & 0xFF);        // Low byte
         }
         temp[i][5] = 0xC8;     //Acceleration
-        temp[i][6] = 0x00;     // Multi-machine synchronization flag
+        temp[i][6] = 0x00;     // Multi-machine synchronization flag,0 for no sync
         temp[i][7] = 0x6B;     // End byte
     }
 }
+
+//多机同步运动指令
+void Send_motor_together(void) {
+    uint8_t data[4];
+    data[0] = 0x00;
+    data[1] = 0xFF;
+    data[2] = 0x66;
+    data[3] = 0x6B;
+}
+
+// 读取电机实时位置
+void Motor_read_coordination(uint8_t motor_id)
+{
+    uint8_t TXdata[3];
+    TXdata[0] = motor_id;
+    TXdata[1] = 0x36;
+    TXdata[2] = 0x6B;
+    uart3WriteBuf((uint8_t*)TXdata, 3);
+}
+
+//位置控制模式，传入脉冲数，32位有符号整数
+void Send_Position_together(int LB, int LF, int RF, int RB, char mode)
+{
+    static uint8_t* LB_postionptr = LB_send;
+    static uint8_t* LF_postionptr = LF_send;
+    static uint8_t* RB_postionptr = RB_send;
+    static uint8_t* RF_postionptr = RF_send;
+    uint8_t* temp[4] = {LB_postionptr, LF_postionptr, RF_postionptr, RB_postionptr};
+    int temppostion = 0;
+    for (uint8_t i = 0; i < 4; i++)
+    {
+        uint8_t var = i;
+        switch (i + 1) {
+            case 1:
+                temppostion = LB;
+                break;
+            case 2:
+                temppostion = LF;
+                break;
+            case 3:
+                temppostion = RF;
+                break;
+            case 4:
+                temppostion = RB;
+                break;
+            default:
+                temppostion = 0;
+                break;
+        }
+        temp[i][0] = var + 1;   // Motor ID
+        temp[i][1] = 0xFD;      // Command for position setting
+        if (temppostion > 0)
+        {
+            temp[i][2] = 0x00;  // Direction
+        }
+        else
+        {
+            temppostion = -temppostion;
+            temp[i][2] = 0x01;
+        }
+        temp[i][3] = 0x2E; // Speed high byte
+        temp[i][4] = 0xE0; // Speed low byte
+
+        temp[i][5] = 0xAE; // ACC original
+
+        // Pulse position (4 bytes)
+        temp[i][6] = (uint8_t)((temppostion * 14) >> 24);
+        temp[i][7] = (uint8_t)((temppostion * 14) >> 16);
+        temp[i][8] = (uint8_t)((temppostion * 14) >> 8);
+        temp[i][9] = (uint8_t)(temppostion * 14);
+
+        temp[i][10] = (uint8_t)mode;    // Absolute/Relative mode
+        temp[i][11] = 0x01;             // Multi-machine sync flag,0 for no sync
+        temp[i][12] = 0x6B;             // End byte
+    }
+}
+
+// 左手坐标系运动解算，逆时针为正
+void Motor_Action_Calculate_target(float vy, float vx, float vw) {
+    __disable_irq();
+    motor1.target_angle = vw + vy + vx; // 1号电机
+    motor2.target_angle = vw + vy - vx; // 2号电机
+    motor3.target_angle = vw - vy - vx; // 3号电机
+    motor4.target_angle = vw - vy + vx; // 4号电机
+    __enable_irq();
+}
+
+
+
 
 
 
