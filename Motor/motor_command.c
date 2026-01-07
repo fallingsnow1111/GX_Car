@@ -1,7 +1,8 @@
 #include "motor_command.h"
 
 //step angle division 1.8/16=0.11255 degree
-#define Angle_division 16
+// #define Angle_division 16
+#define magic_number 14  // some magic number for position conversion
 
 MOTOR_SPEED_t car_setspeed;
 struct MOTOR_DATA motor1;
@@ -14,8 +15,9 @@ static uint8_t LF_send[15];
 static uint8_t RB_send[15];
 static uint8_t RF_send[15];
 
-static uint8_t rx_dat[RXdat_maxsize]={0};
-static char rx_piont=0;
+// Reception buffer
+static uint8_t RX_data[RXdat_maxsize]={0};
+static char RX_piont=0;
 
 void uart3WriteBuf(uint8_t *buf, uint8_t len)
 {
@@ -36,7 +38,7 @@ void Motor_Init(void)
     motor4.target_angle = 0;
     motor4.actual_angle = 0;
     __HAL_UART_ENABLE_IT(&huart3, UART_IT_RXNE); // Enable USART3 interrupt
-    HAL_UARTEx_ReceiveToIdle_DMA(&huart3, rx_dat, RXdat_maxsize); // Start DMA reception
+    HAL_UARTEx_ReceiveToIdle_DMA(&huart3, RX_data, RXdat_maxsize); // Start DMA reception
 }
 
 //输入4个电机速度，单位rpm，16位有符号整数，范围-32768~32767
@@ -161,10 +163,10 @@ void Send_Position_together(int LB, int LF, int RF, int RB, char mode)
         temp[i][5] = 0xAE; // ACC original
 
         // Pulse position (4 bytes)
-        temp[i][6] = (uint8_t)((temppostion * 14) >> 24);
-        temp[i][7] = (uint8_t)((temppostion * 14) >> 16);
-        temp[i][8] = (uint8_t)((temppostion * 14) >> 8);
-        temp[i][9] = (uint8_t)(temppostion * 14);
+        temp[i][6] = (uint8_t)((temppostion * magic_number) >> 24);
+        temp[i][7] = (uint8_t)((temppostion * magic_number) >> 16);
+        temp[i][8] = (uint8_t)((temppostion * magic_number) >> 8);
+        temp[i][9] = (uint8_t)(temppostion *  magic_number);
 
         temp[i][10] = (uint8_t)mode;    // Absolute/Relative mode
         temp[i][11] = 0x01;             // Multi-machine sync flag,0 for no sync
@@ -182,7 +184,41 @@ void Motor_Action_Calculate_target(float vy, float vx, float vw) {
     __enable_irq();
 }
 
+static uint8_t rx_buff1[RXdat_maxsize];
+static uint8_t rx_buff2[RXdat_maxsize];
 
+void USART3_Process_data(void) {
+
+
+}
+
+// 接收完成标志检查，放在自定义中断处理函数中
+void Motor_FinishFlag_Exam(uint8_t *RX_data) {
+    uint8_t buff_len = 0;
+    uint8_t* rxbuff = NULL;
+    uint8_t rxbuff_flag = 0;
+
+    // stop DMA to process received data
+    if (HAL_UART_DMAStop(&huart3) != HAL_OK) {
+        // error handling
+        return;
+    }
+
+    // disable IRQ to ensure data consistency
+    __disable_irq();
+
+    // correctly get DMA reception counter
+    buff_len = RXdat_maxsize - __HAL_DMA_GET_COUNTER(huart3.hdmarx);
+
+    // if ()
+
+}
+
+void My_UART3_IRQHandler(void)
+{
+    Motor_FinishFlag_Exam(RX_data);
+    // USART3_Process_data();
+}
 
 
 

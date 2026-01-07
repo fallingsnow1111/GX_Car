@@ -50,6 +50,7 @@ file(GLOB_RECURSE USER_SOURCES CONFIGURE_DEPENDS
         "Motor/*.c"
         "Task/*.c"
         "MyDefinition/*.c" "MyDefinition/*.h"
+        "MyNVIC/*.c"
 )
 
 # Add sources to executable
@@ -64,6 +65,7 @@ target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
         Motor
         Task
         MyDefinition
+        MyNVIC
 )
 
 # Add project symbols (macros)
