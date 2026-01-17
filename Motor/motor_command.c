@@ -1,10 +1,14 @@
 #include "motor_command.h"
 
+#include <string.h>
+
 //step angle division 1.8/16=0.11255 degree
 // #define Angle_division 16
 #define magic_number 14  // some magic number for position conversion
 
 MOTOR_SPEED_t car_setspeed;
+volatile struct CHECK_FLAG_t motor_check;
+
 struct MOTOR_DATA motor1;
 struct MOTOR_DATA motor2;
 struct MOTOR_DATA motor3;
@@ -38,6 +42,7 @@ void Motor_Init(void)
     motor4.target_angle = 0;
     motor4.actual_angle = 0;
     __HAL_UART_ENABLE_IT(&huart3, UART_IT_RXNE); // Enable USART3 interrupt
+    //开启dma接收，检测到空闲则产生中断并停止
     HAL_UARTEx_ReceiveToIdle_DMA(&huart3, RX_data, RXdat_maxsize); // Start DMA reception
 }
 
@@ -187,9 +192,65 @@ void Motor_Action_Calculate_target(float vy, float vx, float vw) {
 static uint8_t rx_buff1[RXdat_maxsize];
 static uint8_t rx_buff2[RXdat_maxsize];
 
-void USART3_Process_data(void) {
-
-
+void USART3_Process_data(uint8_t* data, uint8_t len) {
+    if (data[len-1] != 0x6B) {
+        return;
+    }
+    if (len == 8) {
+        switch (data[0])
+        {
+            case 0x01://
+            {
+                motor1.actual_angle = (data[3] << 24) | (data[4] << 16) | (data[5] << 8) | data[6] ;
+                motor1.actual_angle = motor1.actual_angle*360/65535;
+                if (data[2] == 0x01) {
+                    motor1.actual_angle = -motor1.actual_angle;
+                }
+                motor_check.flag_finish = motor_check.flag_finish | (1<<0);
+                break;
+            }
+            case 0x02:
+            {
+                motor2.actual_angle = (data[3] << 24) | (data[4] << 16) | (data[5] << 8) | data[6] ;
+                motor2.actual_angle = motor2.actual_angle*360/65535;
+                if (data[2] == 0x01) {
+                    motor2.actual_angle = -motor2.actual_angle;
+                }
+                motor_check.flag_finish = motor_check.flag_finish | (1<<1);
+                break;
+            }
+            case 0x03:
+            {
+                motor3.actual_angle = (data[3] << 24) | (data[4] << 16) | (data[5] << 8) | data[6] ;
+                motor3.actual_angle = motor3.actual_angle*360/65535;
+                if (data[2] == 0x01) {
+                    motor3.actual_angle = -motor3.actual_angle;
+                }
+                motor_check.flag_finish = motor_check.flag_finish | (1<<2);
+                break;
+            }
+            case 0x04:
+            {
+                motor4.actual_angle = (data[3] << 24) | (data[4] << 16) | (data[5] << 8) | data[6] ;
+                motor4.actual_angle = motor4.actual_angle*360/65535;
+                if (data[2] == 0x01) {
+                    motor4.actual_angle = -motor1.actual_angle;
+                }
+                motor_check.flag_finish = motor_check.flag_finish | (1<<3);
+                break;
+            }
+        }
+    }
+    //速度控制模式就绪标志
+    else if (len == 4)
+    {
+        if (data[0] == 0x01 && data[3] == 0x6B) {
+            if (data[2] == 0xF6 && data[3] == 0x02)
+            {
+                motor_check.flag_ready = finish;
+            }
+        }
+    }
 }
 
 // 接收完成标志检查，放在自定义中断处理函数中
@@ -208,16 +269,37 @@ void Motor_FinishFlag_Exam(uint8_t *RX_data) {
     __disable_irq();
 
     // correctly get DMA reception counter
-    buff_len = RXdat_maxsize - __HAL_DMA_GET_COUNTER(huart3.hdmarx);
+    if (huart3.hdmarx != NULL) {
+        buff_len = RXdat_maxsize - __HAL_DMA_GET_COUNTER(huart3.hdmarx);
+    }
 
-    // if ()
-
+    // copy received data to buffer
+    if (buff_len > 0 && RX_data != NULL) {
+        //双缓冲区切换
+        if (rxbuff_flag == 0) {
+            rxbuff = rx_buff1;
+            rxbuff_flag = ~rxbuff_flag;
+        }
+        else {
+            rxbuff = rx_buff2;
+            rxbuff_flag = ~rxbuff_flag;
+        }
+        //复制数据到缓冲区
+        memcpy(rxbuff, RX_data, buff_len);
+        __enable_irq();
+        USART3_Process_data(rxbuff,buff_len);
+    }
+    else {
+        // 恢复中断（如果没有数据或指针无效）
+        __enable_irq();
+    }
 }
 
 void My_UART3_IRQHandler(void)
 {
     Motor_FinishFlag_Exam(RX_data);
-    // USART3_Process_data();
+    //处理完数据重新启动DMA接收
+    HAL_UARTEx_ReceiveToIdle_DMA(&huart3, RX_data, RXdat_maxsize);
 }
 
 

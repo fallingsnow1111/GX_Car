@@ -28,6 +28,11 @@ typedef struct CARDATA_T {
     volatile ABLE_T action_modeable; // 动作模式使能标志
 }CARDATA_T;
 
+typedef struct CHECK_FLAG_t {
+    uint8_t flag_ready;     //任务是否就绪的标识位
+    uint8_t flag_finish;    //任务是否完成的标志位
+};
+
 
 #endif
 
