@@ -179,14 +179,34 @@ void Send_Position_together(int LB, int LF, int RF, int RB, char mode)
     }
 }
 
+void Send_speed_switch(void)
+{
+    uart3WriteBuf(LB_send,8);
+    HAL_Delay(4);
+    uart3WriteBuf(LF_send,8);
+    HAL_Delay(4);
+    uart3WriteBuf(RB_send,8);
+    HAL_Delay(4);
+    uart3WriteBuf(RF_send,8);
+    HAL_Delay(4);
+}
+
 // 左手坐标系运动解算，逆时针为正
-void Motor_Action_Calculate_target(float vy, float vx, float vw) {
+void Motor_Action_Calculate_target(float vx, float vy, float vw) {
     __disable_irq();
     motor1.target_angle = vw + vy + vx; // 1号电机
     motor2.target_angle = vw + vy - vx; // 2号电机
     motor3.target_angle = vw - vy - vx; // 3号电机
     motor4.target_angle = vw - vy + vx; // 4号电机
     __enable_irq();
+}
+
+//延时分别发送速度指令
+void Motor_setspeed(float vx, float vy, float vw)
+{
+    Motor_Action_Calculate_target(vx, vy, vw);
+    Motor_Send_Speed_together(motor1.target_angle, motor2.target_angle, motor3.target_angle, motor4.target_angle);
+    Send_speed_switch();
 }
 
 static uint8_t rx_buff1[RXdat_maxsize];

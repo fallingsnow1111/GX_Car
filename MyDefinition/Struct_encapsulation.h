@@ -1,6 +1,8 @@
 #ifndef __STRUCT_ENCAPSULATION_H
 #define __STRUCT_ENCAPSULATION_H
 
+#include "stdint.h"
+
 #define finish      1
 #define Incomplete  0
 
@@ -33,6 +35,17 @@ typedef struct CHECK_FLAG_t {
     uint8_t flag_finish;    //任务是否完成的标志位
 };
 
+typedef struct PID_struct
+{
+    float kp;
+    float ki;
+    float kd;
+    float integral;
+    float integralMax;
+    float  outputMin;
+    float  outputMax;
+    float previousError;
+};
 
 #endif
 

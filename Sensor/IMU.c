@@ -58,8 +58,8 @@ void IMU_Receive_Init(void)
 void IMU_SetZero(void)
 {
     U2_writebuf(reset_z_axis,5);
-    imu_run.SPEED = 0;
-    imu_run.LAST_ANGEL = 0;
+    imu_run.IS_MOVING = 0;
+    imu_run.LAST_ANGLE = 0;
 }
 
 void Imu_unlock_register(void)
