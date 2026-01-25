@@ -1,6 +1,9 @@
 #include "imu_control.h"
 
+#include <math.h>
 #include <wchar.h>
+
+#include "motor_control.h"
 
 struct PID_struct Gyro_PID;
 struct IMU_RUNDATA imu_run;
@@ -29,7 +32,7 @@ float getAngleZ(float yaw, float my_angle)
     }
 }
 
-float getAngleZ_avg(float yaw, float my_angle)
+float getAngleZ_avg(float my_angle)
 {
     float temp;
     temp = getAngleZ(imu.yaw, my_angle);
@@ -58,6 +61,7 @@ float normalizeAngle(float angle)
     return angle + 360.0f * flag;
 }
 
+//反向控制的原因是？
 void Direction_Calibration(float target_angle)
 {
     float current_angle = normalizeAngle(imu.yaw);
@@ -65,7 +69,7 @@ void Direction_Calibration(float target_angle)
     if (_ABS(target_angle, current_angle) > 0.6f)
     {
         w_output = PID_Compute(&Gyro_PID, target_angle, current_angle);
-        Motor_setspeed(0,0,w_output);
+        Motor_setspeed(0,0,-w_output);
     }
     else
     {
@@ -73,6 +77,19 @@ void Direction_Calibration(float target_angle)
         HAL_Delay(6);
     }
 }
+
+float Direction_Calibration_turn(float target_angle)
+{
+    float current_angle = normalizeAngle(imu.yaw);
+    float w_output = PID_Compute(&Gyro_PID, target_angle, current_angle);
+    // 小输出时设置死区（防止电机抖动）
+    if (fabsf(w_output) < 2.0)
+    {
+        w_output = (w_output > 0) ? 1.0f : -1.0f;
+    }
+    return -w_output;
+}
+
 
 
 

@@ -2,6 +2,8 @@
 
 #include <string.h>
 
+#include "delay.h"
+
 //step angle division 1.8/16=0.11255 degree
 // #define Angle_division 16
 #define magic_number 14  // some magic number for position conversion
@@ -55,7 +57,7 @@ void Motor_Send_Speed_together(float LB, float LF, float RF, float RB)
     static uint8_t* RF_speedptr = RF_send;
     uint8_t* temp[4] = {LB_speedptr, LF_speedptr, RF_speedptr, RB_speedptr};
     int tempspeed = 0;
-    for (uint8_t i = 0; i < 5; i++)
+    for (uint8_t i = 0; i < 4; i++)
     {
         uint8_t var = i;
         switch (i + 1) {
@@ -182,13 +184,13 @@ void Send_Position_together(int LB, int LF, int RF, int RB, char mode)
 void Send_speed_switch(void)
 {
     uart3WriteBuf(LB_send,8);
-    HAL_Delay(4);
+    Delay_ms(4);
     uart3WriteBuf(LF_send,8);
-    HAL_Delay(4);
+    Delay_ms(4);
     uart3WriteBuf(RB_send,8);
-    HAL_Delay(4);
+    Delay_ms(4);
     uart3WriteBuf(RF_send,8);
-    HAL_Delay(4);
+    Delay_ms(4);
 }
 
 // 左手坐标系运动解算，逆时针为正

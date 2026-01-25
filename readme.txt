@@ -27,3 +27,6 @@
 13又是怎么来的呢？也许是机械减速比的原因？待考证。
 所以 magic_num = 14
 
+#include "stm32f7xx_hal.h"写在main.h里,各个外设的.h文件，若报找不到类型定义的错，请把main.h包含进来。
+陀螺仪寻找数据帧的逻辑大有问题
+配置TIM14为systick的时钟源时，会在mian.c自动生成HAL_TIM_PeriodElapsedCallback
